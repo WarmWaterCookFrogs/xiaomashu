@@ -2,7 +2,7 @@
 
 像刷小红书一样逛 GitHub——开源项目发现产品。
 
-**在线体验**：https://tszmzxxx111xzzzww.github.io/xiaomashu/
+**在线体验**：https://warmwatercookfrogs.github.io/xiaomashu/
 
 ## 为什么做这个
 
