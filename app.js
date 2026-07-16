@@ -38,6 +38,7 @@ const state = {
 };
 let current = null; // repo in modal
 let DIGEST = { items: {} }; // AI 导读库（由 GitHub Actions 每日生成）
+let FEED = null; // 静态预生成信息流（hot/new/classic），零 API 首屏
 const aiOf = r => (DIGEST.items[r.full_name] && DIGEST.items[r.full_name].s) || "";
 
 /* ================= query ================= */
@@ -308,13 +309,35 @@ function postComment() {
   toast("评论成功 💬");
 }
 
+/* ============ 信息流来源决策：默认浏览走静态缓存（零 API），仅搜索走实时 API ============ */
+function renderList(list) {
+  reqSeq++; // 作废在途的 API 请求，避免其结果覆盖缓存渲染
+  state.loading = false; state.done = true; // 缓存视图一次性渲染，关闭无限滚动
+  const feed = $("#feed");
+  feed.innerHTML = "";
+  state.seen.clear();
+  list.forEach(it => { state.seen.add(it.full_name); feed.appendChild(card(it)); });
+  if (!feed.children.length) feed.innerHTML = '<div class="state"><div class="big">🧐</div>该筛选暂无缓存结果，试试搜索</div>';
+}
+// 有静态缓存且非搜索场景 → 本地渲染+客户端筛选；否则回退实时 API
+function loadFeed() {
+  if (state.tab === "saved") { renderSaved(); return; }
+  if (!state.q && FEED && Array.isArray(FEED[state.tab])) {
+    let list = FEED[state.tab];
+    if (state.lang) list = list.filter(r => r.language === state.lang);
+    if (state.topic) list = list.filter(r => (r.topics || []).includes(state.topic));
+    if (list.length) { renderList(list); return; }
+  }
+  fetchFeed(false); // 搜索、或缓存未命中 → 实时 API
+}
+
 /* ================= events ================= */
 $("#tabs").addEventListener("click", ev => {
   const b = ev.target.closest(".tab"); if (!b) return;
   $$("#tabs .tab").forEach(t => t.classList.toggle("on", t === b));
   state.tab = b.dataset.tab;
   window.scrollTo(0, 0);
-  if (state.tab === "saved") renderSaved(); else fetchFeed(false);
+  loadFeed();
 });
 function chipHandler(id, key) {
   $(id).addEventListener("click", ev => {
@@ -322,7 +345,7 @@ function chipHandler(id, key) {
     $$(id + " .chip").forEach(c => c.classList.toggle("on", c === b));
     state[key] = b.dataset.v;
     if (state.tab === "saved") { $$("#tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.tab === "hot")); state.tab = "hot"; }
-    fetchFeed(false);
+    loadFeed();
   });
 }
 chipHandler("#langChips", "lang");
@@ -333,7 +356,7 @@ function runSearch() {
   state.q = qInput.value.trim();
   if (state.tab === "saved") { $$("#tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.tab === "hot")); state.tab = "hot"; }
   window.scrollTo(0, 0);
-  fetchFeed(false);
+  loadFeed(); // 有搜索词走实时 API，清空搜索词回到缓存
 }
 qInput.addEventListener("keydown", ev => {
   if (ev.key === "Enter") { ev.preventDefault(); runSearch(); qInput.blur(); }
@@ -360,14 +383,15 @@ if (FEEDBACK_URL) {
   f.href = FEEDBACK_URL; f.target = "_blank"; f.rel = "noopener"; f.style.display = "inline";
 }
 (async function boot() {
-  // 先加载 AI 导读库（由 GitHub Actions 每日生成），再渲染信息流
-  try {
-    const r = await fetch("digest.json?v=" + new Date().toISOString().slice(0, 10));
-    if (r.ok) {
-      const d = await r.json();
-      if (d && d.items) DIGEST = d;
-    }
-  } catch (e) {}
+  $("#feed").innerHTML = '<div class="skel"><div class="a"></div><div class="b"></div></div>'.repeat(6); // 首屏骨架，避免空白闪烁
+  // 并行加载 AI 导读库 + 静态信息流（均由 GitHub Actions 每日生成）
+  const v = "?v=" + new Date().toISOString().slice(0, 10);
+  const [dg, fd] = await Promise.allSettled([
+    fetch("digest.json" + v).then(r => r.ok ? r.json() : null),
+    fetch("feed.json" + v).then(r => r.ok ? r.json() : null)
+  ]);
+  if (dg.status === "fulfilled" && dg.value && dg.value.items) DIGEST = dg.value;
   if (!DIGEST.items) DIGEST.items = {};
-  fetchFeed(false);
+  if (fd.status === "fulfilled" && fd.value && Array.isArray(fd.value.hot)) FEED = fd.value;
+  loadFeed(); // 有缓存则零 API 首屏，否则自动回退实时 API
 })();
