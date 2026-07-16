@@ -42,6 +42,91 @@ let DIGEST = { items: {} }; // AI 导读库（由 GitHub Actions 每日生成）
 let FEED = null; // 静态预生成信息流（hot/new/classic），零 API 首屏
 const aiOf = r => (DIGEST.items[r.full_name] && DIGEST.items[r.full_name].s) || "";
 
+/* ============ ① 云端点赞/评论（Supabase）：填入下面两个值即启用，留空自动回退本地 ============ */
+const SUPABASE_URL = ""; // 例：https://abcd.supabase.co
+const SUPABASE_KEY = ""; // anon public key（设计上可公开，靠数据库 RLS 规则保护）
+const CLOUD = !!(SUPABASE_URL && SUPABASE_KEY);
+const DEVICE = (function () {
+  let d = store.get("crb_device", null);
+  if (!d) { d = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : "d" + Date.now() + Math.random().toString(16).slice(2); store.set("crb_device", d); }
+  return d;
+})();
+function sb(path, opts) {
+  return fetch(SUPABASE_URL + "/rest/v1/" + path, Object.assign({}, opts, {
+    headers: Object.assign({ apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, opts && opts.headers)
+  }));
+}
+async function cloudLike(repo) { try { await sb("likes", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates" }, body: JSON.stringify({ repo: repo, device: DEVICE }) }); } catch (e) {} }
+async function cloudUnlike(repo) { try { await sb("likes?repo=eq." + encodeURIComponent(repo) + "&device=eq." + encodeURIComponent(DEVICE), { method: "DELETE" }); } catch (e) {} }
+async function cloudLikeCount(repo) {
+  try {
+    const r = await sb("likes?repo=eq." + encodeURIComponent(repo) + "&select=repo", { method: "GET", headers: { Prefer: "count=exact", Range: "0-0" } });
+    const cr = r.headers.get("content-range");
+    if (cr && cr.indexOf("/") > -1) return parseInt(cr.split("/")[1], 10) || 0;
+  } catch (e) {}
+  return null;
+}
+async function cloudComments(repo) {
+  try {
+    const r = await sb("comments?repo=eq." + encodeURIComponent(repo) + "&select=name,body,created_at&order=created_at.desc&limit=50", { method: "GET" });
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+async function cloudPostComment(repo, body) {
+  try { const r = await sb("comments", { method: "POST", body: JSON.stringify({ repo: repo, device: DEVICE, name: "访客", body: body }) }); return r.ok; } catch (e) { return false; }
+}
+
+/* ============ ③ 个性化：从点赞行为累积口味画像，用于「发现」页排序 ============ */
+function bumpTaste(repo, dir) {
+  const t = store.get("crb_taste", { langs: {}, topics: {} });
+  if (repo.language) t.langs[repo.language] = Math.max(0, (t.langs[repo.language] || 0) + dir);
+  (repo.topics || []).forEach(tp => { t.topics[tp] = Math.max(0, (t.topics[tp] || 0) + dir); });
+  store.set("crb_taste", t);
+}
+function tasteScore(repo) {
+  const t = store.get("crb_taste", { langs: {}, topics: {} });
+  let s = (repo.language && t.langs[repo.language]) ? t.langs[repo.language] * 2 : 0;
+  (repo.topics || []).forEach(tp => { s += (t.topics[tp] || 0); });
+  return s;
+}
+function hasTaste() { const t = store.get("crb_taste", null); return !!(t && (Object.keys(t.langs || {}).length + Object.keys(t.topics || {}).length) >= 2); }
+
+/* ============ ② AI 语义搜索：用 AI 导读做中文语义索引 + 同义词扩展，客户端零 API ============ */
+const SYN = {
+  ppt: ["演示", "演示文稿", "幻灯", "幻灯片", "slide", "slides", "presentation"],
+  爬虫: ["抓取", "采集", "crawl", "crawler", "scrape", "scraper", "spider"],
+  画图: ["绘图", "作图", "绘画", "图像", "image", "draw", "diagram", "画画"],
+  视频: ["剪辑", "video", "影音"], 音乐: ["audio", "music", "声音", "语音"],
+  翻译: ["translate", "translation", "翻译器"], 简历: ["resume", "cv", "求职"],
+  表格: ["excel", "spreadsheet", "sheet", "电子表格"], 数据: ["data", "数据分析", "分析"],
+  聊天: ["chat", "对话", "bot", "机器人", "助手", "assistant"], 写作: ["writing", "文案", "写作助手"],
+  数据库: ["database", "db", "sql"], 部署: ["deploy", "docker", "运维", "k8s"],
+  笔记: ["note", "notes", "markdown", "记事"], 密码: ["password", "auth", "认证", "登录"],
+  下载: ["download", "下载器"], 图标: ["icon", "icons", "图标库"], 模板: ["template", "boilerplate", "脚手架"]
+};
+function expandTokens(q) {
+  const toks = q.toLowerCase().split(/[\s,，、。]+/).filter(Boolean);
+  const out = new Set(toks);
+  toks.forEach(tk => { for (const k in SYN) { if (k === tk || tk.indexOf(k) > -1 || SYN[k].indexOf(tk) > -1) { out.add(k); SYN[k].forEach(s => out.add(s.toLowerCase())); } } });
+  return [...out];
+}
+function semanticSearch(q) {
+  if (!FEED) return [];
+  const pool = new Map();
+  ["hot", "new", "classic"].forEach(k => (FEED[k] || []).forEach(r => pool.set(r.full_name, r)));
+  const toks = expandTokens(q), ql = q.toLowerCase();
+  const scored = [];
+  pool.forEach(r => {
+    const hay = (r.full_name + " " + (r.description || "") + " " + (r.topics || []).join(" ") + " " + aiOf(r)).toLowerCase();
+    let s = 0; toks.forEach(t => { if (t && hay.indexOf(t) > -1) s++; });
+    if (r.name && r.name.toLowerCase().indexOf(ql) > -1) s += 3; // 名称命中加权
+    if (s > 0) scored.push([s, r]);
+  });
+  scored.sort((a, b) => b[0] - a[0] || (b[1].stargazers_count || 0) - (a[1].stargazers_count || 0));
+  return scored.slice(0, 40).map(x => x[1]);
+}
+
 /* ================= query ================= */
 function buildQuery() {
   const parts = [];
@@ -142,8 +227,11 @@ function card(repo) {
 
 /* ================= like / save / comment ================= */
 function toggleLike(repo) {
-  if (state.likes[repo.full_name]) delete state.likes[repo.full_name];
-  else { state.likes[repo.full_name] = 1; toast("点赞成功 ❤️"); }
+  if (state.likes[repo.full_name]) {
+    delete state.likes[repo.full_name]; bumpTaste(repo, -1); if (CLOUD) cloudUnlike(repo.full_name);
+  } else {
+    state.likes[repo.full_name] = 1; bumpTaste(repo, +1); if (CLOUD) cloudLike(repo.full_name); toast("点赞成功 ❤️");
+  }
   store.set("crb_likes", state.likes);
 }
 function snapshot(repo) {
@@ -198,8 +286,8 @@ function openModal(repo) {
       '<div class="m-sec">README 速览</div>' +
       '<div class="readme-wrap clip"><div class="md" id="readme">加载中…</div></div>' +
       '<button class="md-more" id="mdMore" style="display:none">展开全文 ⌄</button>' +
-      '<div class="m-sec">评论</div>' +
-      '<div class="cmt-hint">评论目前保存在你的浏览器本地（v2 将支持云端同步）</div>' +
+      '<div class="m-sec">评论 <span id="likeCount" style="font-size:12px;color:var(--ink3);font-weight:400;margin-left:6px"></span></div>' +
+      '<div class="cmt-hint">' + (CLOUD ? "评论与点赞已云端同步，所有人可见 ☁️" : "评论暂存在你的浏览器本地") + "</div>" +
       '<div id="cmts"></div>' +
     "</div>";
   const mImg = $(".m-cover img");
@@ -237,6 +325,9 @@ function openModal(repo) {
 
   renderComments();
   loadReadme(repo);
+  if (CLOUD) cloudLikeCount(repo.full_name).then(n => {
+    if (n != null && current && current.full_name === repo.full_name) { const el = $("#likeCount"); if (el) el.textContent = "· " + n + " 人点赞"; }
+  });
   $("#overlay").classList.add("show");
   $("#modal").classList.add("show");
   document.body.style.overflow = "hidden";
@@ -291,23 +382,44 @@ async function loadReadme(repo) {
   }
 }
 
-/* ================= comments ================= */
-function renderComments() {
+/* ================= comments（① 云端优先，未配置则本地） ================= */
+function commentHTML(name, body, ts) {
+  return '<div class="cmt"><div class="av">' + esc((name || "我")[0]) + '</div><div><div class="t">' + esc(body) + '</div><div class="ts">' + timeStr(ts) + "</div></div></div>";
+}
+async function renderComments() {
   if (!current) return;
-  const list = state.comments[current.full_name] || [];
+  const repo = current.full_name;
+  if (CLOUD) {
+    $("#cmts").innerHTML = '<div class="cmt-hint" style="margin:4px 0 20px">加载评论中…</div>';
+    const rows = await cloudComments(repo);
+    if (!current || current.full_name !== repo) return;
+    $("#cmts").innerHTML = (rows && rows.length)
+      ? rows.map(c => commentHTML(c.name, c.body, c.created_at)).join("")
+      : '<div class="cmt-hint" style="margin:4px 0 20px">还没有评论，坐个沙发？</div>';
+    return;
+  }
+  const list = state.comments[repo] || [];
   $("#cmts").innerHTML = list.length
-    ? list.map(c => '<div class="cmt"><div class="av">我</div><div><div class="t">' + esc(c.t) + '</div><div class="ts">' + timeStr(c.ts) + "</div></div></div>").join("")
+    ? list.map(c => commentHTML("我", c.t, c.ts)).join("")
     : '<div class="cmt-hint" style="margin:4px 0 20px">还没有评论，坐个沙发？</div>';
 }
-function postComment() {
+async function postComment() {
   const input = $("#cmtInput");
   const t = input.value.trim();
   if (!t || !current) return;
-  const list = state.comments[current.full_name] || [];
-  list.unshift({ t, ts: Date.now() });
-  state.comments[current.full_name] = list.slice(0, 50);
-  store.set("crb_comments", state.comments);
+  const repo = current.full_name;
   input.value = "";
+  if (CLOUD) {
+    const ok = await cloudPostComment(repo, t);
+    if (!ok) { toast("评论发送失败，请重试"); return; }
+    toast("评论成功 💬");
+    renderComments();
+    return;
+  }
+  const list = state.comments[repo] || [];
+  list.unshift({ t, ts: Date.now() });
+  state.comments[repo] = list.slice(0, 50);
+  store.set("crb_comments", state.comments);
   renderComments();
   toast("评论成功 💬");
 }
@@ -404,9 +516,13 @@ function renderList(list) {
 function loadFeed() {
   if (state.tab === "saved") { renderSaved(); return; }
   if (!state.q && FEED && Array.isArray(FEED[state.tab])) {
-    let list = FEED[state.tab];
+    let list = FEED[state.tab].slice();
     if (state.lang) list = list.filter(r => r.language === state.lang);
     if (state.topic) list = list.filter(r => (r.topics || []).includes(state.topic));
+    // ③ 个性化：发现页无筛选时，按点赞口味排序（稳定排序，同分保持原榜单顺序）
+    if (state.tab === "hot" && !state.lang && !state.topic && hasTaste()) {
+      list = list.map((r, i) => [r, i]).sort((a, b) => (tasteScore(b[0]) - tasteScore(a[0])) || (a[1] - b[1])).map(x => x[0]);
+    }
     if (list.length) { renderList(list); return; }
   }
   fetchFeed(false); // 搜索、或缓存未命中 → 实时 API
@@ -437,7 +553,11 @@ function runSearch() {
   state.q = qInput.value.trim();
   if (state.tab === "saved") { $$("#tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.tab === "hot")); state.tab = "hot"; }
   window.scrollTo(0, 0);
-  loadFeed(); // 有搜索词走实时 API，清空搜索词回到缓存
+  if (!state.q) { loadFeed(); return; } // 清空搜索 → 回到缓存信息流
+  // ② AI 语义搜索：先在本地语义索引（AI 导读）里匹配，命中够多就零 API 直出
+  const local = semanticSearch(state.q);
+  if (local.length >= 3) { renderList(local); toast("🔍 智能匹配 " + local.length + " 个项目"); return; }
+  fetchFeed(false); // 语义命中不足 → 回退实时 GitHub 搜索
 }
 qInput.addEventListener("keydown", ev => {
   if (ev.key === "Enter") { ev.preventDefault(); runSearch(); qInput.blur(); }
