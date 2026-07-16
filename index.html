@@ -123,6 +123,16 @@ header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdro
 .act.on{color:var(--red)}
 .gh-btn{background:var(--ink);color:var(--card);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:999px;white-space:nowrap}
 
+/* ---------- 分享海报 ---------- */
+#posterOverlay{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+#posterOverlay.show{display:flex}
+.poster-box{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:400px;width:100%;margin:auto}
+#posterImg{width:100%;max-width:360px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.poster-tip{color:rgba(255,255,255,.9);font-size:13px;text-align:center;line-height:1.6}
+.poster-btns{display:flex;gap:12px;width:100%;max-width:360px}
+.poster-dl{flex:1;text-align:center;background:var(--red);color:#fff;font-weight:600;font-size:15px;padding:12px;border-radius:999px}
+.poster-cancel{flex:none;padding:12px 22px;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;font-size:15px}
+
 #toast{position:fixed;left:50%;bottom:12vh;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;font-size:13.5px;padding:9px 18px;border-radius:999px;z-index:99;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap}
 #toast.show{opacity:1}
 footer{max-width:1360px;margin:0 auto;padding:24px 16px 40px;font-size:11.5px;color:var(--ink3);text-align:center;line-height:1.8}
@@ -192,6 +202,16 @@ footer{max-width:1360px;margin:0 auto;padding:24px 16px 40px;font-size:11.5px;co
   <button class="m-close" id="mClose">✕</button>
   <div class="m-scroll" id="mScroll"></div>
   <div class="m-actions" id="mActions"></div>
+</div>
+<div id="posterOverlay">
+  <div class="poster-box">
+    <img id="posterImg" alt="项目分享海报">
+    <div class="poster-tip">长按图片保存，或点下方按钮下载，去小红书分享吧 📕</div>
+    <div class="poster-btns">
+      <a id="posterDl" class="poster-dl" download="小码书.png">下载海报</a>
+      <button id="posterClose" class="poster-cancel">关闭</button>
+    </div>
+  </div>
 </div>
 <div id="toast"></div>
 
