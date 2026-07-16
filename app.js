@@ -76,6 +76,16 @@ async function cloudComments(repo) {
 async function cloudPostComment(repo, body) {
   try { const r = await sb("comments", { method: "POST", body: JSON.stringify({ repo: repo, device: DEVICE, name: "访客", body: body }) }); return r.ok; } catch (e) { return false; }
 }
+// 反馈：复用 comments 表，挂在虚拟项目 __feedback__ 上（前台永不展示；后台按 repo 筛选查看）
+async function cloudFeedback(text) {
+  try { const r = await sb("comments", { method: "POST", body: JSON.stringify({ repo: "__feedback__", device: DEVICE, name: "反馈", body: text }) }); return r.ok; } catch (e) { return false; }
+}
+
+/* ============ 埋点：关键行为写入 events 表（fire-and-forget，未建表则静默跳过） ============ */
+function track(type, detail) {
+  if (!CLOUD) return;
+  try { sb("events", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ type: type, detail: (detail || "").slice(0, 120), device: DEVICE }) }).catch(() => {}); } catch (e) {}
+}
 
 /* ============ ③ 个性化：从点赞行为累积口味画像，用于「发现」页排序 ============ */
 function bumpTaste(repo, dir) {
@@ -230,7 +240,7 @@ function toggleLike(repo) {
   if (state.likes[repo.full_name]) {
     delete state.likes[repo.full_name]; bumpTaste(repo, -1); if (CLOUD) cloudUnlike(repo.full_name);
   } else {
-    state.likes[repo.full_name] = 1; bumpTaste(repo, +1); if (CLOUD) cloudLike(repo.full_name); toast("点赞成功 ❤️");
+    state.likes[repo.full_name] = 1; bumpTaste(repo, +1); if (CLOUD) cloudLike(repo.full_name); track("like", repo.full_name); toast("点赞成功 ❤️");
   }
   store.set("crb_likes", state.likes);
 }
@@ -255,6 +265,7 @@ function renderSaved() {
 /* ================= modal ================= */
 function openModal(repo) {
   current = repo;
+  track("open", repo.full_name);
   const liked = !!state.likes[repo.full_name];
   const saved = !!state.saves[repo.full_name];
   const ai = aiOf(repo);
@@ -306,6 +317,7 @@ function openModal(repo) {
   $("#aSave").addEventListener("click", () => { toggleSave(repo); openActionsRefresh(); });
   $("#aPoster").addEventListener("click", () => showPoster(repo));
   $("#aShare").addEventListener("click", async () => {
+    track("share", repo.full_name);
     const text = repo.full_name + " · " + repo.html_url;
     try {
       if (navigator.share) { await navigator.share({ title: repo.full_name, url: repo.html_url }); return; }
@@ -495,6 +507,7 @@ function makePoster(repo) {
 }
 function showPoster(repo) {
   let url;
+  track("poster", repo.full_name);
   try { url = makePoster(repo); } catch (e) { toast("海报生成失败，请重试"); return; }
   $("#posterImg").src = url;
   const dl = $("#posterDl");
@@ -554,6 +567,7 @@ function runSearch() {
   if (state.tab === "saved") { $$("#tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.tab === "hot")); state.tab = "hot"; }
   window.scrollTo(0, 0);
   if (!state.q) { loadFeed(); return; } // 清空搜索 → 回到缓存信息流
+  track("search", state.q);
   // ② AI 语义搜索：先在本地语义索引（AI 导读）里匹配，有命中就零 API 直出（质量优于英文接口搜中文）
   const local = semanticSearch(state.q);
   if (local.length >= 1) { renderList(local); toast("🔍 智能匹配 " + local.length + " 个项目"); return; }
@@ -581,11 +595,26 @@ new IntersectionObserver(entries => {
   if (entries[0].isIntersecting && state.tab !== "saved" && !state.loading && !state.done) fetchFeed(true);
 }, { rootMargin: "800px" }).observe($("#sentinel"));
 
-/* ================= go ================= */
-if (FEEDBACK_URL) {
-  const f = $("#fbLink");
-  f.href = FEEDBACK_URL; f.target = "_blank"; f.rel = "noopener"; f.style.display = "inline";
+/* ================= 反馈弹窗 ================= */
+function openFeedback() { $("#fbText").value = ""; $("#fbOverlay").classList.add("show"); track("feedback_open"); setTimeout(() => $("#fbText").focus(), 50); }
+function closeFeedback() { $("#fbOverlay").classList.remove("show"); }
+async function sendFeedback() {
+  const t = $("#fbText").value.trim();
+  if (!t) { toast("写点什么再提交呀～"); return; }
+  if (!CLOUD) { toast("反馈通道未开启"); return; }
+  const ok = await cloudFeedback(t);
+  toast(ok ? "收到，谢谢你的反馈 🙏" : "提交失败，稍后再试");
+  if (ok) { track("feedback_send"); closeFeedback(); }
 }
+(function () {
+  const f = $("#fbLink");
+  if (f) { f.style.display = "inline"; f.style.cursor = "pointer"; f.addEventListener("click", openFeedback); }
+  $("#fbSend").addEventListener("click", sendFeedback);
+  $("#fbCancel").addEventListener("click", closeFeedback);
+  $("#fbOverlay").addEventListener("click", ev => { if (ev.target.id === "fbOverlay") closeFeedback(); });
+})();
+
+/* ================= go ================= */
 (async function boot() {
   $("#feed").innerHTML = '<div class="skel"><div class="a"></div><div class="b"></div></div>'.repeat(6); // 首屏骨架，避免空白闪烁
   // 并行加载 AI 导读库 + 静态信息流（均由 GitHub Actions 每日生成）
