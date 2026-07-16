@@ -19,6 +19,7 @@ const HEART_F = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7
 const MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
 const MARK_F = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
 const SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>';
+const POSTER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="M20 15l-4-4-7 7"/></svg>';
 const LANG_COLORS = { Python: "#3572A5", TypeScript: "#3178c6", JavaScript: "#f1e05a", Go: "#00ADD8", Rust: "#dea584", Java: "#b07219", "C++": "#f34b7d", C: "#555", Swift: "#F05138", Kotlin: "#A97BFF", Ruby: "#701516", PHP: "#4F5D95", "Jupyter Notebook": "#DA5B0B", Shell: "#89e051", HTML: "#e34c26", CSS: "#563d7c", Dart: "#00B4AB" };
 
 let toastTimer;
@@ -210,10 +211,12 @@ function openModal(repo) {
     '<button class="act' + (liked ? " on" : "") + '" id="aLike">' + (liked ? HEART_F : HEART) + "<span>点赞</span></button>" +
     '<button class="act' + (saved ? " on" : "") + '" id="aSave">' + (saved ? MARK_F : MARK) + "<span>收藏</span></button>" +
     '<button class="act" id="aShare">' + SHARE + "<span>分享</span></button>" +
+    '<button class="act" id="aPoster">' + POSTER + "<span>海报</span></button>" +
     '<a class="gh-btn" href="' + esc(repo.html_url) + '" target="_blank" rel="noopener">去 GitHub ↗</a>';
 
   $("#aLike").addEventListener("click", () => { toggleLike(repo); openActionsRefresh(); refreshFeedHearts(repo); });
   $("#aSave").addEventListener("click", () => { toggleSave(repo); openActionsRefresh(); });
+  $("#aPoster").addEventListener("click", () => showPoster(repo));
   $("#aShare").addEventListener("click", async () => {
     const text = repo.full_name + " · " + repo.html_url;
     try {
@@ -309,6 +312,84 @@ function postComment() {
   toast("评论成功 💬");
 }
 
+/* ================= 分享海报（纯 canvas，无外部依赖，CSP 安全） ================= */
+function wrapText(ctx, text, maxWidth) {
+  const lines = []; let line = "";
+  for (const ch of String(text)) {
+    if (ch === "\n") { lines.push(line); line = ""; continue; }
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = ch; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function makePoster(repo) {
+  const W = 1080, H = 1440;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#ff2442"); g.addColorStop(1, "#c81030");
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  // 顶部品牌
+  x.textBaseline = "alphabetic"; x.textAlign = "left";
+  x.fillStyle = "#fff"; x.font = 'bold 46px -apple-system,"PingFang SC",sans-serif';
+  x.fillText("📕 小码书", 70, 108);
+  x.font = '28px -apple-system,"PingFang SC",sans-serif'; x.fillStyle = "rgba(255,255,255,.85)";
+  x.textAlign = "right"; x.fillText("发现全世界的好项目", W - 70, 108); x.textAlign = "left";
+  // 白卡
+  const M = 70, cardY = 150, cardH = H - 300;
+  x.fillStyle = "#fff"; roundRect(x, M, cardY, W - 2 * M, cardH, 48); x.fill();
+  const px = M + 60, cw = W - 2 * M - 120; let y = cardY + 110;
+  // owner / repo
+  x.fillStyle = "#999"; x.font = '34px -apple-system,"PingFang SC",sans-serif';
+  x.fillText(repo.owner.login + " /", px, y); y += 78;
+  x.fillStyle = "#222"; x.font = 'bold 72px -apple-system,"PingFang SC",sans-serif';
+  for (const ln of wrapText(x, repo.name, cw).slice(0, 2)) { x.fillText(ln, px, y); y += 84; }
+  y += 30;
+  // AI 导读优先，否则英文描述
+  const ai = aiOf(repo);
+  if (ai) {
+    x.fillStyle = "#ff2442"; roundRect(x, px, y - 42, 78, 50, 12); x.fill();
+    x.fillStyle = "#fff"; x.font = 'bold 30px -apple-system,sans-serif'; x.fillText("AI", px + 17, y - 6);
+    y += 34;
+    x.fillStyle = "#333"; x.font = '40px -apple-system,"PingFang SC",sans-serif';
+    for (const ln of wrapText(x, ai, cw).slice(0, 7)) { x.fillText(ln, px, y); y += 58; }
+  } else if (repo.description) {
+    x.fillStyle = "#555"; x.font = '38px -apple-system,"PingFang SC",sans-serif';
+    for (const ln of wrapText(x, repo.description, cw).slice(0, 5)) { x.fillText(ln, px, y); y += 54; }
+  }
+  // 底部统计
+  const by = cardY + cardH - 180;
+  x.fillStyle = "#ff2442"; x.font = 'bold 52px -apple-system,sans-serif';
+  x.fillText("★ " + fmt(repo.stargazers_count), px, by);
+  if (repo.language) { x.fillStyle = "#4a6ee0"; x.font = '38px -apple-system,sans-serif'; x.fillText("● " + repo.language, px + 300, by - 3); }
+  x.strokeStyle = "#eee"; x.lineWidth = 2; x.beginPath(); x.moveTo(px, by + 48); x.lineTo(W - px, by + 48); x.stroke();
+  x.fillStyle = "#999"; x.font = '32px -apple-system,"PingFang SC",sans-serif';
+  x.fillText("像刷小红书一样逛 GitHub", px, by + 112);
+  x.fillStyle = "#ff2442"; x.font = 'bold 32px -apple-system,sans-serif';
+  x.fillText("warmwatercookfrogs.github.io/xiaomashu", px, by + 160);
+  return c.toDataURL("image/png");
+}
+function showPoster(repo) {
+  let url;
+  try { url = makePoster(repo); } catch (e) { toast("海报生成失败，请重试"); return; }
+  $("#posterImg").src = url;
+  const dl = $("#posterDl");
+  dl.href = url; dl.download = "小码书_" + repo.name + ".png";
+  $("#posterOverlay").classList.add("show");
+}
+
 /* ============ 信息流来源决策：默认浏览走静态缓存（零 API），仅搜索走实时 API ============ */
 function renderList(list) {
   reqSeq++; // 作废在途的 API 请求，避免其结果覆盖缓存渲染
@@ -371,7 +452,10 @@ qInput.addEventListener("search", () => { if (!qInput.value.trim() && state.q) r
 
 $("#mClose").addEventListener("click", closeModal);
 $("#overlay").addEventListener("click", closeModal);
-document.addEventListener("keydown", ev => { if (ev.key === "Escape") closeModal(); });
+function closePoster() { $("#posterOverlay").classList.remove("show"); }
+$("#posterClose").addEventListener("click", closePoster);
+$("#posterOverlay").addEventListener("click", ev => { if (ev.target.id === "posterOverlay") closePoster(); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape") { closePoster(); closeModal(); } });
 
 new IntersectionObserver(entries => {
   if (entries[0].isIntersecting && state.tab !== "saved" && !state.loading && !state.done) fetchFeed(true);
