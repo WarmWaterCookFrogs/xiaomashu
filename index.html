@@ -7,6 +7,23 @@
 <meta name="color-scheme" content="light dark">
 <title>小码书 · 发现全世界的好项目</title>
 <meta name="description" content="像刷小红书一样逛 GitHub：热门开源项目瀑布流，AI 中文导读，点赞、收藏、评论。">
+<meta name="theme-color" content="#ff2442">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23ff2442'/%3E%3Ctext x='50' y='72' font-size='62' font-weight='700' text-anchor='middle' fill='white' font-family='PingFang SC,Microsoft YaHei,sans-serif'%3E码%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<!-- 分享预览卡片（微信/小红书/Twitter） -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="小码书">
+<meta property="og:title" content="小码书 · 像刷小红书一样逛 GitHub">
+<meta property="og:description" content="AI 中文导读 · 语义搜索 · 社区点赞评论，发现全世界的好项目。">
+<meta property="og:url" content="https://warmwatercookfrogs.github.io/xiaomashu/">
+<meta property="og:image" content="https://warmwatercookfrogs.github.io/xiaomashu/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="小码书 · 像刷小红书一样逛 GitHub">
+<meta name="twitter:description" content="AI 中文导读 · 语义搜索 · 社区点赞评论。">
+<meta name="twitter:image" content="https://warmwatercookfrogs.github.io/xiaomashu/og.png">
 <script src="purify.min.js"></script>
 <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 <style>
@@ -133,6 +150,18 @@ header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdro
 .poster-dl{flex:1;text-align:center;background:var(--red);color:#fff;font-weight:600;font-size:15px;padding:12px;border-radius:999px}
 .poster-cancel{flex:none;padding:12px 22px;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;font-size:15px}
 
+/* ---------- 反馈弹窗 ---------- */
+#fbOverlay{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
+#fbOverlay.show{display:flex}
+.fb-box{background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:380px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.fb-title{font-size:17px;font-weight:800}
+.fb-sub{font-size:12.5px;color:var(--ink3);margin:6px 0 12px;line-height:1.5}
+.fb-text{width:100%;height:110px;resize:none;border:1px solid var(--line);border-radius:10px;padding:11px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--bg);outline:none}
+.fb-text:focus{border-color:var(--red)}
+.fb-btns{display:flex;gap:10px;margin-top:14px}
+.fb-send{flex:1;background:var(--red);color:#fff;font-weight:600;font-size:15px;padding:11px;border-radius:999px}
+.fb-cancel{flex:none;padding:11px 20px;border-radius:999px;background:var(--bg);color:var(--ink2);font-size:15px}
+
 #toast{position:fixed;left:50%;bottom:12vh;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;font-size:13.5px;padding:9px 18px;border-radius:999px;z-index:99;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap}
 #toast.show{opacity:1}
 footer{max-width:1360px;margin:0 auto;padding:24px 16px 40px;font-size:11.5px;color:var(--ink3);text-align:center;line-height:1.8}
@@ -213,6 +242,17 @@ footer{max-width:1360px;margin:0 auto;padding:24px 16px 40px;font-size:11.5px;co
     </div>
   </div>
 </div>
+<div id="fbOverlay">
+  <div class="fb-box">
+    <div class="fb-title">💬 吐槽与建议</div>
+    <div class="fb-sub">你的一句话会直接决定下个版本改什么，匿名提交</div>
+    <textarea id="fbText" class="fb-text" maxlength="200" placeholder="哪里不好用？想要什么功能？尽管说…"></textarea>
+    <div class="fb-btns">
+      <button id="fbSend" class="fb-send">提交</button>
+      <button id="fbCancel" class="fb-cancel">关闭</button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <footer>
@@ -221,6 +261,6 @@ footer{max-width:1360px;margin:0 auto;padding:24px 16px 40px;font-size:11.5px;co
   <span id="busuanzi_container_site_pv" style="display:none">累计访问 <span id="busuanzi_value_site_pv"></span> 次 · </span><span id="busuanzi_container_site_uv" style="display:none">访客 <span id="busuanzi_value_site_uv"></span> 人</span>
 </footer>
 
-<script src="app.js" defer></script>
+<script src="app.js?v=18" defer></script>
 </body>
 </html>
