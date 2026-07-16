@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>小码书 · 发现全世界的好项目</title>
-<meta name="description" content="像刷小红书一样逛 GitHub：热门开源项目瀑布流，点赞、收藏、评论。">
+<meta name="description" content="像刷小红书一样逛 GitHub：热门开源项目瀑布流，AI 中文导读，点赞、收藏、评论。">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
 <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 <style>
@@ -48,6 +49,8 @@ header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdro
 .c-body{padding:10px 12px 12px}
 .c-title{font-size:14.5px;font-weight:700;line-height:1.35;word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .c-desc{font-size:12.5px;color:var(--ink2);line-height:1.5;margin-top:5px;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.c-ai{display:flex;gap:6px;align-items:flex-start;font-size:12.5px;line-height:1.55;color:var(--ink);margin-top:6px;background:var(--red-soft);border-radius:8px;padding:6px 8px}
+.ai-tag{flex:none;font-size:10px;color:#fff;background:var(--red);border-radius:4px;padding:1px 5px;margin-top:2px;font-weight:600;letter-spacing:.5px}
 .c-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .tag{font-size:11px;color:var(--ink2);background:var(--bg);border-radius:5px;padding:2px 7px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tag.lang{color:#4a6ee0;background:#eef2ff}
@@ -84,6 +87,7 @@ header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdro
 .m-owner{display:flex;align-items:center;gap:8px;margin-top:10px}
 .m-owner img{width:30px;height:30px;border-radius:50%}
 .m-owner .n{font-size:13.5px;font-weight:600}
+.m-ai{font-size:13.5px;margin-top:12px}
 .m-desc{font-size:14px;line-height:1.65;color:var(--ink);margin-top:12px}
 .m-stats{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px;font-size:12.5px;color:var(--ink2)}
 .m-stats b{color:var(--ink);font-size:14px;display:block}
@@ -101,7 +105,7 @@ header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdro
 .md a{color:#4a6ee0}
 .md table{border-collapse:collapse;display:block;overflow-x:auto}
 .md td,.md th{border:1px solid var(--line);padding:5px 9px;font-size:12.5px}
-.md-more{width:100%;padding:10px;color:var(--red);font-weight:600;font-size:13.5px;background:linear-gradient(rgba(255,255,255,0),#fff 60%);margin-top:-40px;position:relative}
+.md-more{width:100%;padding:10px;color:var(--red);font-weight:600;font-size:13.5px;background:linear-gradient(rgba(255,255,255,0),var(--card) 60%);margin-top:-40px;position:relative}
 .readme-wrap.clip .md{max-height:520px;overflow:hidden}
 
 /* comments */
@@ -112,15 +116,31 @@ header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdro
 .cmt-hint{font-size:11.5px;color:var(--ink3);margin-bottom:10px}
 .m-actions{position:absolute;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
 @media(min-width:700px){.m-actions{border-radius:0 0 16px 16px}}
-.cmt-input{flex:1;background:var(--bg);border-radius:999px;padding:9px 14px;font-size:13.5px;border:none;outline:none}
+.cmt-input{flex:1;background:var(--bg);border-radius:999px;padding:9px 14px;font-size:13.5px;border:none;outline:none;color:var(--ink)}
 .act{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10.5px;color:var(--ink2);min-width:34px}
 .act svg{width:21px;height:21px}
 .act.on{color:var(--red)}
-.gh-btn{background:var(--ink);color:#fff;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:999px;white-space:nowrap}
+.gh-btn{background:var(--ink);color:var(--card);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:999px;white-space:nowrap}
 
 #toast{position:fixed;left:50%;bottom:12vh;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;font-size:13.5px;padding:9px 18px;border-radius:999px;z-index:99;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap}
 #toast.show{opacity:1}
 footer{max-width:1360px;margin:0 auto;padding:24px 16px 40px;font-size:11.5px;color:var(--ink3);text-align:center;line-height:1.8}
+
+/* ---------- dark mode ---------- */
+@media (prefers-color-scheme: dark){
+  :root{--bg:#121212;--card:#1e1e20;--ink:#eaeaea;--ink2:#a5a5a8;--ink3:#7a7a7e;--line:#2c2c2f;--red-soft:#3a161d}
+  header{background:rgba(24,24,26,.96)}
+  .search{background:#2a2a2d}
+  .tag{background:#2a2a2d;color:#b6b6ba}
+  .tag.lang{background:#1f2a4a;color:#8fa8ff}
+  .cover,.m-cover{background:#242427}
+  .m-stats{background:#232326}
+  .md{color:#cfcfd2}
+  .md pre{background:#232326}
+  .md code{background:#2a2a2d}
+  .skel .a,.skel .b{background:linear-gradient(90deg,#242427 25%,#2e2e31 50%,#242427 75%);background-size:200% 100%;animation:sh 1.2s infinite}
+  .card{box-shadow:0 1px 4px rgba(0,0,0,.4)}
+}
 </style>
 </head>
 <body>
@@ -176,7 +196,7 @@ footer{max-width:1360px;margin:0 auto;padding:24px 16px 40px;font-size:11.5px;co
 
 <footer>
   小码书 · 个人学习项目 · <a id="fbLink" style="display:none;color:var(--red);font-weight:600">💬 吐槽与建议</a><br>
-  数据来自 GitHub 公开 API · 与 GitHub, Inc. 及小红书无任何隶属关系<br>
+  AI 导读由大模型自动生成，仅供参考 · 数据来自 GitHub 公开 API · 与 GitHub, Inc. 及小红书无任何隶属关系<br>
   <span id="busuanzi_container_site_pv" style="display:none">累计访问 <span id="busuanzi_value_site_pv"></span> 次 · </span><span id="busuanzi_container_site_uv" style="display:none">访客 <span id="busuanzi_value_site_uv"></span> 人</span>
 </footer>
 
@@ -198,8 +218,8 @@ const timeStr = ts => { const d = new Date(ts); const p = x => String(x).padStar
 const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7.5-4.6-10-9.6C.6 8 2.4 4.5 6 4.5c2.2 0 3.7 1.2 6 3.6 2.3-2.4 3.8-3.6 6-3.6 3.6 0 5.4 3.5 4 6.9-2.5 5-10 9.6-10 9.6z"/></svg>';
 const HEART_F = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-10-9.6C.6 8 2.4 4.5 6 4.5c2.2 0 3.7 1.2 6 3.6 2.3-2.4 3.8-3.6 6-3.6 3.6 0 5.4 3.5 4 6.9-2.5 5-10 9.6-10 9.6z"/></svg>';
 const MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
-const SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>';
 const MARK_F = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
+const SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>';
 const LANG_COLORS = { Python: "#3572A5", TypeScript: "#3178c6", JavaScript: "#f1e05a", Go: "#00ADD8", Rust: "#dea584", Java: "#b07219", "C++": "#f34b7d", C: "#555", Swift: "#F05138", Kotlin: "#A97BFF", Ruby: "#701516", PHP: "#4F5D95", "Jupyter Notebook": "#DA5B0B", Shell: "#89e051", HTML: "#e34c26", CSS: "#563d7c", Dart: "#00B4AB" };
 
 let toastTimer;
@@ -218,6 +238,8 @@ const state = {
   comments: store.get("crb_comments", {}) // full_name -> [{t, ts}]
 };
 let current = null; // repo in modal
+let DIGEST = { items: {} }; // AI 导读库（由 GitHub Actions 每日生成）
+const aiOf = r => (DIGEST.items[r.full_name] && DIGEST.items[r.full_name].s) || "";
 
 /* ================= query ================= */
 function buildQuery() {
@@ -284,6 +306,7 @@ function card(repo) {
   el.className = "card";
   el.dataset.repo = repo.full_name;
   const liked = !!state.likes[repo.full_name];
+  const ai = aiOf(repo);
   const langDot = repo.language
     ? '<span class="tag lang"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (LANG_COLORS[repo.language] || "#999") + ';margin-right:4px"></span>' + esc(repo.language) + "</span>" : "";
   const topics = (repo.topics || []).slice(0, 2).map(t => '<span class="tag">#' + esc(t) + "</span>").join("");
@@ -291,7 +314,9 @@ function card(repo) {
     '<div class="cover"><img loading="lazy" alt=""></div>' +
     '<div class="c-body">' +
       '<div class="c-title">' + esc(repo.name) + "</div>" +
-      (repo.description ? '<div class="c-desc">' + esc(repo.description) + "</div>" : "") +
+      (ai
+        ? '<div class="c-ai"><span class="ai-tag">AI</span><span>' + esc(ai) + "</span></div>"
+        : (repo.description ? '<div class="c-desc">' + esc(repo.description) + "</div>" : "")) +
       '<div class="c-tags">' + langDot + topics + "</div>" +
       '<div class="c-foot">' +
         '<img loading="lazy" src="' + esc(repo.owner.avatar_url) + '&s=40" alt="">' +
@@ -343,12 +368,14 @@ function openModal(repo) {
   current = repo;
   const liked = !!state.likes[repo.full_name];
   const saved = !!state.saves[repo.full_name];
+  const ai = aiOf(repo);
   const lic = repo.license && repo.license.spdx_id && repo.license.spdx_id !== "NOASSERTION" ? repo.license.spdx_id : "—";
   $("#mScroll").innerHTML =
     '<div class="m-cover"><img alt=""></div>' +
     '<div class="m-body">' +
       '<div class="m-title">' + esc(repo.full_name) + "</div>" +
       '<div class="m-owner"><img src="' + esc(repo.owner.avatar_url) + '&s=60" alt=""><span class="n">' + esc(repo.owner.login) + '</span></div>' +
+      (ai ? '<div class="c-ai m-ai"><span class="ai-tag">AI 导读</span><span>' + esc(ai) + "</span></div>" : "") +
       (repo.description ? '<div class="m-desc">' + esc(repo.description) + "</div>" : "") +
       '<div class="m-stats">' +
         "<span><b>" + fmt(repo.stargazers_count) + "</b>Star</span>" +
@@ -533,7 +560,18 @@ if (FEEDBACK_URL) {
   const f = $("#fbLink");
   f.href = FEEDBACK_URL; f.target = "_blank"; f.rel = "noopener"; f.style.display = "inline";
 }
-fetchFeed(false);
+(async function boot() {
+  // 先加载 AI 导读库（由 GitHub Actions 每日生成），再渲染信息流
+  try {
+    const r = await fetch("digest.json?v=" + new Date().toISOString().slice(0, 10));
+    if (r.ok) {
+      const d = await r.json();
+      if (d && d.items) DIGEST = d;
+    }
+  } catch (e) {}
+  if (!DIGEST.items) DIGEST.items = {};
+  fetchFeed(false);
+})();
 </script>
 </body>
 </html>
