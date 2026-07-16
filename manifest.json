@@ -1,0 +1,15 @@
+{
+  "name": "小码书 · 发现全世界的好项目",
+  "short_name": "小码书",
+  "description": "像刷小红书一样逛 GitHub：AI 中文导读、语义搜索、社区点赞评论。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f7f7",
+  "theme_color": "#ff2442",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
