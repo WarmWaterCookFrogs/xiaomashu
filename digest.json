@@ -1,6 +1,10 @@
 {
- "generated_at": "2026-07-26T21:57:24.466Z",
+ "generated_at": "2026-07-27T22:04:32.254Z",
  "items": {
+  "vercel-labs/scriptc": {
+   "s": "这个项目可以把普通的TypeScript代码编译成小巧快速的本地可执行文件，省去运行时的JavaScript引擎，让你的代码在不依赖Node的情况下直接运行，适合想要高效执行TypeScript的用户。",
+   "t": 1785189867753
+  },
   "oil-oil/beautify-github-readme": {
    "s": "这个项目可以帮助你设计清晰、主题鲜明的GitHub自述文件，让访问者一眼就能理解你的项目内容，使用起来也很方便，适合各种类型的开发者和创作者。",
    "t": 1785103039964
